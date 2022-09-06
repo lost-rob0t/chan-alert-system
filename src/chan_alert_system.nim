@@ -24,8 +24,9 @@ proc `$`(reply: Reply): string =
 
 proc initDb(path: string) =
   let db = open(path, "", "", "")
+  var smts: seq[SqlQuery]
   let
-    POSTS = sql"""CREATE TABLE IF NOT EXISTS  "Posts" (
+    posts = sql"""CREATE TABLE IF NOT EXISTS  "Posts" (
     "postId"	INTEGER NOT NULL UNIQUE,
     "board"	TEXT NOT NULL,
     "subject"	TEXT,
@@ -38,14 +39,30 @@ proc initDb(path: string) =
     "replyTo"	INTEGER NOT NULL);
   """
 
-    INDEX = sql"""CREATE INDEX IF NOT EXISTS "postsIndex" ON "Posts" (
+    index = sql"""CREATE INDEX IF NOT EXISTS "postsIndex" ON "Posts" (
     "board"	DESC,
     "threadId"	DESC,
     "postId"	DESC
     );
   """
-  db.exec(POSTS)
-  db.exec(INDEX)
+    namesList = sql"""
+    CREATE VIEW IF NOT EXISTS namesListing AS
+    SELECT DISTINCT(posterName) FROM Posts WHERE posterName != "Anonymous";
+  """
+    threadsList = sql"""
+    CREATE VIEW IF NOT EXISTS threadListing AS
+    SELECT Subject, posterName, comment, threadId FROM Posts WHERE replyTo = 0;
+    """
+    namedPostsListing = sql"""
+    CREATE VIEW IF NOT EXISTS namesPostsListing AS
+    SELECT * FROM Posts WHERE posterName != "Anonymous";
+    """
+
+  db.exec(posts)
+  db.exec(index)
+  db.exec(namesList)
+  db.exec(threadsList)
+  db.exec(namedPostsListing)
   db.close()
 proc insertPost*(db: DbConn, replies: seq[Reply]) =
   for chunk in replies.distribute(num=20, spread=false):
